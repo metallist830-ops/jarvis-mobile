@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Jarvis AI",
+    "slug": "jarvis-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jarvis.ai.mobile",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Jarvis needs microphone access for voice commands",
+        "NSSpeechRecognitionUsageDescription": "Jarvis needs speech recognition for voice input"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "package": "com.jarvis.ai.mobile",
+      "permissions": [
+        "RECORD_AUDIO",
+        "INTERNET"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "publicPath": "/"
+    },
+    "plugins": [],
+    "extra": {
+      "jarvisApiUrl": "http://178.67.89.247:9000",
+      "eas": {
+        "projectId": "2fd51da0-8752-457f-8f1d-8ad1ca0a7ad6"
+      }
+    },
+    "cli": {
+      "appVersionSource": "remote"
+    },
+    "owner": "rscrews-team"
+  }
+}
