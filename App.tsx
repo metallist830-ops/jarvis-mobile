@@ -17,7 +17,12 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
+    let recovered = false;
     const checkNetwork = async () => {
+      if (!recovered) {
+        recovered = true;
+        try { await MessageQueue.recoverInterruptedMessages(); } catch { /* Preserve the queue if recovery fails. */ }
+      }
       try {
         const info = await Network.getNetworkStateAsync();
         if (active) setConnected(Boolean(info.isConnected && info.isInternetReachable !== false));
