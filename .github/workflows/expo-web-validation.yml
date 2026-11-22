@@ -1,0 +1,64 @@
+name: Expo web validation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: expo-web-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Regenerate npm lockfile
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Commit lockfile when changed
+        run: |
+          if ! git diff --quiet -- package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "chore: sync npm lockfile"
+            git pull --rebase origin ${{ github.head_ref || github.ref_name }}
+            git push origin HEAD:${{ github.head_ref || github.ref_name }}
+          fi
+
+      - name: Install from lockfile
+        run: npm ci
+
+      - name: Validate Expo configuration
+        run: npx expo config --type public
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Export web app
+        run: npm run build
+
+      - name: Upload web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-web-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7

@@ -1,68 +1,105 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Animated } from 'react-native';
-import Voice from '@react-native-voice/voice';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  Animated,
+} from 'react-native';
+import {
+  ExpoSpeechRecognitionModule,
+} from 'expo-speech-recognition';
 import { MessageQueue } from '../messageQueue';
 
 const VoiceInput: React.FC = () => {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [pulse] = useState(new Animated.Value(1));
+  const [pulse] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
-    Voice.onSpeechStart = () => {
+    const startListener = ExpoSpeechRecognitionModule.addListener('start', () => {
       setListening(true);
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulse, { toValue: 1.5, duration: 1000, useNativeDriver: true }),
-          Animated.timing(pulse, { toValue: 1, duration: 1000, useNativeDriver: true }),
-        ])
+          Animated.timing(pulse, {
+            toValue: 1.5,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulse, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ]),
       ).start();
-    };
+    });
 
-    Voice.onSpeechEnd = () => {
+    const endListener = ExpoSpeechRecognitionModule.addListener('end', () => {
       setListening(false);
       pulse.stopAnimation();
-    };
+      pulse.setValue(1);
+    });
 
-    Voice.onSpeechResults = (e: { value?: string[] }) => {
-      if (e.value && e.value.length > 0) {
-        setTranscript(e.value[0]);
-      }
-    };
+    const resultListener = ExpoSpeechRecognitionModule.addListener('result', (event) => {
+      const recognizedText = event.results?.[0]?.transcript;
+      if (recognizedText) setTranscript(recognizedText);
+    });
 
-    Voice.onSpeechError = (e: { error?: { message?: string } }) => {
+    const errorListener = ExpoSpeechRecognitionModule.addListener('error', (event) => {
       setListening(false);
-      console.warn('Voice error:', e.error?.message);
-    };
+      pulse.stopAnimation();
+      pulse.setValue(1);
+      console.warn('Speech recognition error:', event.message);
+    });
 
     return () => {
-      Voice.removeAllListeners('onSpeechStart');
-      Voice.removeAllListeners('onSpeechEnd');
-      Voice.removeAllListeners('onSpeechResults');
-      Voice.removeAllListeners('onSpeechError');
+      startListener.remove();
+      endListener.remove();
+      resultListener.remove();
+      errorListener.remove();
+      pulse.stopAnimation();
     };
   }, [pulse]);
 
   const startListening = async () => {
     try {
-      await Voice.start('en-US');
-    } catch (e) {
-      console.warn(e);
+      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!permission.granted) {
+        console.warn('Microphone or speech-recognition permission was not granted.');
+        return;
+      }
+
+      setTranscript('');
+      ExpoSpeechRecognitionModule.start({
+        lang: 'ru-RU',
+        interimResults: true,
+        maxAlternatives: 1,
+        continuous: false,
+      });
+    } catch (error) {
+      console.warn('Unable to start speech recognition:', error);
+      setListening(false);
     }
   };
 
-  const stopListening = async () => {
+  const stopListening = () => {
     try {
-      await Voice.stop();
-    } catch (e) {
-      console.warn(e);
+      if (listening) ExpoSpeechRecognitionModule.stop();
+    } catch (error) {
+      console.warn('Unable to stop speech recognition:', error);
     }
   };
 
   const handleTranscript = async () => {
-    if (transcript.trim()) {
-      await MessageQueue.addMessage(transcript.trim());
+    const text = transcript.trim();
+    if (!text) return;
+
+    try {
+      await MessageQueue.addMessage(text);
       setTranscript('');
+    } catch (error) {
+      console.warn('Unable to queue recognized speech:', error);
     }
   };
 
@@ -78,7 +115,7 @@ const VoiceInput: React.FC = () => {
           <View style={styles.innerButton}>
             <Text style={styles.micIcon}>🎤</Text>
             <Text style={styles.buttonText}>
-              {listening ? 'Listening...' : 'Hold to Speak'}
+              {listening ? 'Слушаю…' : 'Удерживайте для речи'}
             </Text>
           </View>
         </Animated.View>
@@ -88,7 +125,7 @@ const VoiceInput: React.FC = () => {
         <View style={styles.transcriptBox}>
           <Text style={styles.transcriptText}>{transcript}</Text>
           <TouchableOpacity onPress={handleTranscript}>
-            <Text style={styles.sendButton}>Send →</Text>
+            <Text style={styles.sendButton}>Отправить →</Text>
           </TouchableOpacity>
         </View>
       ) : null}

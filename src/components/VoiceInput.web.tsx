@@ -1,10 +1,9 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 /**
- * Web fallback for the native speech-recognition control.
- * The native implementation remains in VoiceInput.tsx.
- * Chat input remains available through DisplayArea on web.
+ * The web build keeps text chat available.
+ * Native speech recognition is provided by VoiceInput.tsx in iOS/Android builds.
  */
 const VoiceInput: React.FC = () => (
   <View style={styles.container}>
@@ -18,7 +17,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 12,
     alignItems: 'center',
-    ...(Platform.OS === 'web' ? { width: '100%' } : {}),
+    width: '100%',
   },
   note: {
     color: '#8E8E93',

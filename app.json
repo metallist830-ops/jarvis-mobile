@@ -38,7 +38,9 @@
       "bundler": "metro",
       "publicPath": "/"
     },
-    "plugins": [],
+    "plugins": [
+      "expo-speech-recognition"
+    ],
     "extra": {
       "jarvisApiUrl": "http://178.67.89.247:9000",
       "eas": {

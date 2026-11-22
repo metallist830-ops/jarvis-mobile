@@ -11,12 +11,21 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "types": ["react-native", "jest"],
-    "lib": ["es2022"],
+    "types": [
+      "react-native"
+    ],
+    "lib": [
+      "es2022"
+    ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": [
+        "src/*"
+      ]
     }
   },
-  "exclude": ["node_modules", "babel.config.js"]
+  "exclude": [
+    "node_modules",
+    "babel.config.js"
+  ]
 }
