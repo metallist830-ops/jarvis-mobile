@@ -5,56 +5,83 @@ import VoiceInput from './src/components/VoiceInput';
 import DisplayArea from './src/components/DisplayArea';
 import * as Network from 'expo-network';
 
+const API_URL = 'http://178.67.89.247:9000';
+
 export default function App() {
   const [connected, setConnected] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
+    let active = true;
+
     const checkNetwork = async () => {
-      const info = await Network.getNetworkStateAsync();
-      const online = info.isConnected && info.isInternetReachable !== false;
-      setConnected(online);
-      if (online) {
-        const count = await MessageQueue.getPendingCount();
-        setPendingCount(count);
+      try {
+        const info = await Network.getNetworkStateAsync();
+        const online = Boolean(info.isConnected) && info.isInternetReachable !== false;
+        if (!active) return;
+        setConnected(online);
+        setPendingCount(await MessageQueue.getPendingCount());
+      } catch (error) {
+        console.warn('Network status check failed:', error);
       }
     };
 
-    checkNetwork();
-    const interval = setInterval(checkNetwork, 5000);
-    return () => clearInterval(interval);
+    void checkNetwork();
+    const interval = setInterval(() => void checkNetwork(), 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, []);
 
-  // Background sync loop
   useEffect(() => {
-    const syncLoop = setInterval(async () => {
-      if (!connected) return;
-      const pending = await MessageQueue.getPending();
-      if (pending.length === 0) return;
+    if (!connected) return;
 
-      for (const msg of pending.slice(0, 3)) {
-        await MessageQueue.setSending(msg.id);
-        try {
-          const response = await fetch('http://178.67.89.247:9000/hermes/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: msg.text }),
-            timeout: 10000,
-          });
-          const data = await response.json();
-          if (response.ok && data.response) {
-            await MessageQueue.setSent(msg.id, data.response);
-          } else {
-            await MessageQueue.setFailed(msg.id);
+    let active = true;
+    let syncing = false;
+
+    const syncPendingMessages = async () => {
+      if (syncing) return;
+      syncing = true;
+      try {
+        const pending = await MessageQueue.getPending();
+        for (const message of pending.slice(0, 3)) {
+          if (!active) break;
+          await MessageQueue.setSending(message.id);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+          try {
+            const response = await fetch(`${API_URL}/hermes/chat`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt: message.text }),
+              signal: controller.signal,
+            });
+            const data = await response.json();
+            if (response.ok && data.response) {
+              await MessageQueue.setSent(message.id, data.response);
+            } else {
+              await MessageQueue.setFailed(message.id);
+            }
+          } catch (error) {
+            await MessageQueue.setFailed(message.id);
+          } finally {
+            clearTimeout(timeoutId);
           }
-        } catch {
-          await MessageQueue.setFailed(msg.id);
         }
+        if (active) setPendingCount(await MessageQueue.getPendingCount());
+      } finally {
+        syncing = false;
       }
-      setPendingCount(await MessageQueue.getPendingCount());
-    }, 5000);
+    };
 
-    return () => clearInterval(syncLoop);
+    void syncPendingMessages();
+    const interval = setInterval(() => void syncPendingMessages(), 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [connected]);
 
   return (
@@ -106,4 +133,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
