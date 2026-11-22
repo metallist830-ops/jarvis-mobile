@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { MessageQueue } from '../messageQueue';
 
@@ -35,9 +34,14 @@ const DisplayArea: React.FC = () => {
 
   const loadMessages = async () => {
     try {
-      // In a real app you'd load from a local DB or AsyncStorage
       const queue = await MessageQueue.getPending();
-      // Just show current UI messages; queue items are shown as pending
+      setMessages(queue.map(message => ({
+        id: message.id,
+        text: message.text,
+        sender: 'user' as const,
+        timestamp: message.timestamp,
+        status: 'pending' as const,
+      })));
     } catch (e) {
       console.warn('Failed to load messages:', e);
     }
@@ -58,12 +62,15 @@ const DisplayArea: React.FC = () => {
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     try {
       const response = await fetch(`${API_URL}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
-        timeout: 10000,
+        signal: controller.signal,
       });
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -75,7 +82,7 @@ const DisplayArea: React.FC = () => {
         sender: 'assistant',
         timestamp: Date.now(),
       };
-      setMessages(prev => [...prev, assistantMsg]);
+      setMessages(prev => [...prev.map(message => message.id === userMsg.id ? { ...message, status: 'sent' as const } : message), assistantMsg]);
     } catch (e) {
       // Queue the message for offline
       await MessageQueue.addMessage(text);
@@ -87,6 +94,7 @@ const DisplayArea: React.FC = () => {
       };
       setMessages(prev => [...prev, systemMsg]);
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
