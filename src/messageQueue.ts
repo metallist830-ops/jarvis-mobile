@@ -50,6 +50,18 @@ export class MessageQueue {
 
   static async add(text: string): Promise<QueuedMessage> { return this.addMessage(text); }
 
+  static async recoverInterruptedMessages(): Promise<void> {
+    const queue = await this.getQueue();
+    let changed = false;
+    for (const message of queue) {
+      if (message.status === 'sending') {
+        message.status = 'pending';
+        changed = true;
+      }
+    }
+    if (changed) await this.saveQueue(queue);
+  }
+
   static async getPending(): Promise<QueuedMessage[]> {
     return (await this.getQueue()).filter(message => message.status === 'pending');
   }
