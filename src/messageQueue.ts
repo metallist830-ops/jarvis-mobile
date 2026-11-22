@@ -1,16 +1,18 @@
 /**
- * Message queue with AsyncStorage persistence for offline mode
+ * Persistent message queue for offline-first chat.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const QUEUE_KEY = 'jarvis_message_queue';
+const MAX_RETRIES = 5;
 
-interface QueuedMessage {
+export interface QueuedMessage {
   id: string;
   text: string;
   timestamp: number;
   status: 'pending' | 'sending' | 'sent' | 'failed';
   retryCount?: number;
+  response?: string;
 }
 
 export class MessageQueue {
@@ -41,37 +43,46 @@ export class MessageQueue {
     return msg;
   }
 
-  // Alias for convenience
   static async add(text: string): Promise<QueuedMessage> {
     return this.addMessage(text);
   }
 
   static async getPending(): Promise<QueuedMessage[]> {
     const queue = await this.getQueue();
-    return queue.filter(m => m.status === 'pending');
+    return queue.filter(message => message.status === 'pending');
   }
 
   static async getNextPending(): Promise<QueuedMessage | null> {
     const queue = await this.getQueue();
-    const msg = queue.find(m => m.status === 'pending');
-    return msg || null;
+    return queue.find(message => message.status === 'pending') || null;
   }
 
   static async markAsSending(id: string): Promise<void> {
     const queue = await this.getQueue();
-    const idx = queue.findIndex(m => m.id === id);
-    if (idx !== -1) {
-      queue[idx].status = 'sending';
-      queue[idx].retryCount = (queue[idx].retryCount || 0) + 1;
+    const index = queue.findIndex(message => message.id === id);
+    if (index !== -1) {
+      queue[index].status = 'sending';
+      queue[index].retryCount = (queue[index].retryCount || 0) + 1;
       await this.saveQueue(queue);
     }
   }
 
-  static async markAsSent(id: string): Promise<void> {
+  static async markAsSent(id: string, response?: string): Promise<void> {
     const queue = await this.getQueue();
-    const idx = queue.findIndex(m => m.id === id);
-    if (idx !== -1) {
-      queue[idx].status = 'sent';
+    const index = queue.findIndex(message => message.id === id);
+    if (index !== -1) {
+      queue[index].status = 'sent';
+      if (response !== undefined) queue[index].response = response;
+      await this.saveQueue(queue);
+    }
+  }
+
+  static async markAsFailed(id: string): Promise<void> {
+    const queue = await this.getQueue();
+    const index = queue.findIndex(message => message.id === id);
+    if (index !== -1) {
+      const retries = queue[index].retryCount || 0;
+      queue[index].status = retries < MAX_RETRIES ? 'pending' : 'failed';
       await this.saveQueue(queue);
     }
   }
@@ -80,8 +91,8 @@ export class MessageQueue {
     return this.markAsSending(id);
   }
 
-  static async setSent(id: string): Promise<void> {
-    return this.markAsSent(id);
+  static async setSent(id: string, response?: string): Promise<void> {
+    return this.markAsSent(id, response);
   }
 
   static async setFailed(id: string): Promise<void> {
@@ -90,6 +101,6 @@ export class MessageQueue {
 
   static async getPendingCount(): Promise<number> {
     const queue = await this.getQueue();
-    return queue.filter(m => m.status === 'pending').length;
+    return queue.filter(message => message.status === 'pending').length;
   }
 }
