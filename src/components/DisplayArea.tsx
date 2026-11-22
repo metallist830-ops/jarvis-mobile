@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { MessageQueue } from '../messageQueue';
 
@@ -35,9 +34,29 @@ const DisplayArea: React.FC = () => {
 
   const loadMessages = async () => {
     try {
-      // In a real app you'd load from a local DB or AsyncStorage
-      const queue = await MessageQueue.getPending();
-      // Just show current UI messages; queue items are shown as pending
+      const queue = await MessageQueue.getQueue();
+      const restored: Message[] = [];
+
+      for (const item of queue.slice(-100)) {
+        restored.push({
+          id: item.id,
+          text: item.text,
+          sender: 'user',
+          timestamp: item.timestamp,
+          status: item.status === 'sent' ? 'sent' : item.status === 'failed' ? 'failed' : 'pending',
+        });
+
+        if (item.responseText) {
+          restored.push({
+            id: item.id + '-reply',
+            text: item.responseText,
+            sender: 'assistant',
+            timestamp: item.timestamp,
+          });
+        }
+      }
+
+      setMessages(restored);
     } catch (e) {
       console.warn('Failed to load messages:', e);
     }
@@ -63,7 +82,6 @@ const DisplayArea: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
-        timeout: 10000,
       });
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
