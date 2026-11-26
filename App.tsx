@@ -4,6 +4,7 @@ import { MessageQueue } from './src/messageQueue';
 import VoiceInput from './src/components/VoiceInput';
 import DisplayArea from './src/components/DisplayArea';
 import * as Network from 'expo-network';
+import { JARVIS_API_BASE_URL } from './src/config';
 
 export default function App() {
   const [connected, setConnected] = useState(true);
@@ -28,14 +29,14 @@ export default function App() {
   // Background sync loop
   useEffect(() => {
     const syncLoop = setInterval(async () => {
-      if (!connected) return;
+      if (!connected || !JARVIS_API_BASE_URL) return;
       const pending = await MessageQueue.getPending();
       if (pending.length === 0) return;
 
       for (const msg of pending.slice(0, 3)) {
         await MessageQueue.setSending(msg.id);
         try {
-          const response = await fetch('http://178.67.89.247:9000/hermes/chat', {
+          const response = await fetch(`${JARVIS_API_BASE_URL}/hermes/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ prompt: msg.text }),
@@ -43,7 +44,7 @@ export default function App() {
           });
           const data = await response.json();
           if (response.ok && data.response) {
-            await MessageQueue.setSent(msg.id, data.response);
+            await MessageQueue.setSent(msg.id);
           } else {
             await MessageQueue.setFailed(msg.id);
           }
