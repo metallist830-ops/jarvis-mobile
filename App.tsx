@@ -13,7 +13,7 @@ export default function App() {
   useEffect(() => {
     const checkNetwork = async () => {
       const info = await Network.getNetworkStateAsync();
-      const online = info.isConnected && info.isInternetReachable !== false;
+      const online = info.isConnected === true && info.isInternetReachable !== false;
       setConnected(online);
       if (online) {
         const count = await MessageQueue.getPendingCount();
