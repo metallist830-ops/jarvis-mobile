@@ -84,6 +84,15 @@ export class MessageQueue {
     return this.markAsSent(id);
   }
 
+  static async markAsFailed(id: string): Promise<void> {
+    const queue = await this.getQueue();
+    const idx = queue.findIndex(m => m.id === id);
+    if (idx !== -1) {
+      queue[idx].status = 'failed';
+      await this.saveQueue(queue);
+    }
+  }
+
   static async setFailed(id: string): Promise<void> {
     return this.markAsFailed(id);
   }
