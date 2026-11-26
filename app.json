@@ -40,7 +40,6 @@
     },
     "plugins": [],
     "extra": {
-      "jarvisApiUrl": "http://178.67.89.247:9000",
       "eas": {
         "projectId": "2fd51da0-8752-457f-8f1d-8ad1ca0a7ad6"
       }
